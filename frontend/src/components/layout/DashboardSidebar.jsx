@@ -6,11 +6,13 @@ import {
   UserGroupIcon,
   ChartPieIcon,
   ArrowTrendingUpIcon,
+  BuildingOfficeIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Skill Snapshot', href: '/dashboard/skills', icon: ChartBarIcon },
   { name: 'Career Suggestions', href: '/dashboard/careers', icon: BriefcaseIcon },
+  { name: 'Job Listings', href: '/dashboard/jobs', icon: BuildingOfficeIcon },
   { name: 'Skill Gap Analysis', href: '/dashboard/gaps', icon: ArrowTrendingUpIcon },
   { name: 'Resume Center', href: '/dashboard/resume', icon: DocumentTextIcon },
   { name: 'Interview Prep', href: '/dashboard/interview', icon: UserGroupIcon },

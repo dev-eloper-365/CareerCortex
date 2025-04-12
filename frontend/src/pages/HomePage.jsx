@@ -131,74 +131,6 @@ export default function HomePage() {
         </div>
       </div>
 
-<<<<<<< HEAD
-      {/* Services Section */}
-      <div className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-              Our Services
-            </h2>
-            <p className="mt-4 text-lg text-gray-500">
-              Comprehensive solutions for your business needs
-            </p>
-          </div>
-          <div className="mt-12 grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {services.map((service, index) => (
-              <div
-                key={index}
-                className={`relative rounded-lg p-6 ${
-                  service.highlighted
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 text-gray-900'
-                }`}
-              >
-                {service.link ? (
-                  <Link to={service.link} className="block">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <service.icon
-                          className={`h-8 w-8 ${
-                            service.highlighted ? 'text-white' : 'text-blue-600'
-                          }`}
-                        />
-                      </div>
-                      <div className="ml-4">
-                        <h3 className="text-lg font-medium">{service.title}</h3>
-                        <p
-                          className={`mt-1 ${
-                            service.highlighted ? 'text-blue-100' : 'text-gray-500'
-                          }`}
-                        >
-                          {service.description}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                ) : (
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <service.icon
-                        className={`h-8 w-8 ${
-                          service.highlighted ? 'text-white' : 'text-blue-600'
-                        }`}
-                      />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-medium">{service.title}</h3>
-                      <p
-                        className={`mt-1 ${
-                          service.highlighted ? 'text-blue-100' : 'text-gray-500'
-                        }`}
-                      >
-                        {service.description}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-=======
       {/* ====================== SECTION 3: TAILORED SOLUTIONS ====================== */}
       <div className="py-12 bg-white">
         <div className="max-w-[90%] mx-auto px-4 sm:px-6 lg:px-8">
@@ -247,7 +179,6 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
->>>>>>> a9958bf34cecfa3425e662210064af224f26bc80
           </div>
         </div>
       </div>
