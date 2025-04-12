@@ -1,9 +1,18 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
 // Load environment variables
 dotenv.config();
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  });
 
 const app = express();
 
@@ -11,10 +20,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Import routes
+const smartBotRoutes = require('./routes/smartBotRoutes');
+const authRoutes = require('./routes/authRoutes');
+
 // Routes
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to CareerCortex API' });
 });
+
+// Use routes
+app.use('/api/smart-bot', smartBotRoutes);
+app.use('/api/auth', authRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

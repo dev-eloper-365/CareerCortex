@@ -1,0 +1,9 @@
+12/4/2025, 10:59:55 pm - User: hey
+
+12/4/2025, 10:59:55 pm - Assistant: It's great to connect with you. I'm here to help you explore your career options and find a path that's a good fit for you. To get started, can you tell me a little bit about yourself and what brings you here today? What are your interests, and what kind of work are you looking to do?
+
+12/4/2025, 10:59:55 pm - User: i want to be a developer
+
+12/4/2025, 10:59:55 pm - Assistant: That's a great goal. The field of development is constantly evolving and has a wide range of specialties. To help narrow down some options, can you tell me what type of development are you interested in? For example, are you interested in web development, mobile app development, game development, or something else?
+
+Also, do you have any prior experience or education in programming, or are you just starting out? Knowing this will help me give you more tailored advice and suggestions.

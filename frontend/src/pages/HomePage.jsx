@@ -6,6 +6,7 @@ import {
   CurrencyDollarIcon,
   MagnifyingGlassIcon,
   UserGroupIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 
 const services = [
@@ -29,6 +30,12 @@ const services = [
     title: 'HR Management',
     description: 'Talent solutions',
     icon: UserGroupIcon,
+  },
+  {
+    title: 'Career Guidance',
+    description: 'AI-powered career assistance',
+    icon: ChatBubbleLeftRightIcon,
+    link: '/assistant',
   },
 ];
 
@@ -139,50 +146,71 @@ export default function HomePage() {
       </div>
 
       {/* Services Section */}
-      <div className="py-12 bg-white">
+      <div className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h2 className="text-3xl font-extrabold text-gray-900">
-              Tailored Solutions for Your Success
+            <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
+              Our Services
             </h2>
+            <p className="mt-4 text-lg text-gray-500">
+              Comprehensive solutions for your business needs
+            </p>
           </div>
-
-          <div className="mt-10">
-            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              {services.map((service) => (
-                <div
-                  key={service.title}
-                  className={`relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-500 rounded-lg transition-all duration-200 ${
-                    service.highlighted ? 'bg-yellow-50' : ''
-                  }`}
-                >
-                  <div>
-                    <span className="rounded-lg inline-flex p-3 bg-indigo-50 text-indigo-700 ring-4 ring-white">
-                      <service.icon className="h-6 w-6" aria-hidden="true" />
-                    </span>
+          <div className="mt-12 grid gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {services.map((service, index) => (
+              <div
+                key={index}
+                className={`relative rounded-lg p-6 ${
+                  service.highlighted
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-900'
+                }`}
+              >
+                {service.link ? (
+                  <Link to={service.link} className="block">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <service.icon
+                          className={`h-8 w-8 ${
+                            service.highlighted ? 'text-white' : 'text-blue-600'
+                          }`}
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <h3 className="text-lg font-medium">{service.title}</h3>
+                        <p
+                          className={`mt-1 ${
+                            service.highlighted ? 'text-blue-100' : 'text-gray-500'
+                          }`}
+                        >
+                          {service.description}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <service.icon
+                        className={`h-8 w-8 ${
+                          service.highlighted ? 'text-white' : 'text-blue-600'
+                        }`}
+                      />
+                    </div>
+                    <div className="ml-4">
+                      <h3 className="text-lg font-medium">{service.title}</h3>
+                      <p
+                        className={`mt-1 ${
+                          service.highlighted ? 'text-blue-100' : 'text-gray-500'
+                        }`}
+                      >
+                        {service.description}
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-8">
-                    <h3 className="text-lg font-medium">
-                      <Link to="/services" className="focus:outline-none">
-                        <span className="absolute inset-0" aria-hidden="true" />
-                        {service.title}
-                      </Link>
-                    </h3>
-                    <p className="mt-2 text-sm text-gray-500">
-                      {service.description}
-                    </p>
-                  </div>
-                  <span
-                    className="pointer-events-none absolute top-6 right-6 text-gray-300 group-hover:text-gray-400"
-                    aria-hidden="true"
-                  >
-                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z" />
-                    </svg>
-                  </span>
-                </div>
-              ))}
-            </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
