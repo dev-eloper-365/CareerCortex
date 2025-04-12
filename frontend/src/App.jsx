@@ -15,6 +15,7 @@ import ResumeCenterPage from './pages/dashboard/ResumeCenterPage';
 import InterviewPrepPage from './pages/dashboard/InterviewPrepPage';
 import NetworkingZonePage from './pages/dashboard/NetworkingZonePage';
 import ProgressTrackerPage from './pages/dashboard/ProgressTrackerPage';
+import JobApplyPage from './pages/dashboard/JobApplyPage';
 
 // Other Main Pages
 import QuizCenterPage from './pages/QuizCenterPage';
@@ -64,6 +65,14 @@ export default function App() {
           element={
             <DashboardLayout>
               <SkillGapAnalysisPage />
+            </DashboardLayout>
+          }
+        />
+        <Route
+          path="/dashboard/jobs"
+          element={
+            <DashboardLayout>
+              <JobApplyPage />
             </DashboardLayout>
           }
         />
