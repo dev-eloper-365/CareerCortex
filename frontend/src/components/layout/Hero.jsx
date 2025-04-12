@@ -40,12 +40,11 @@ export default function Hero() {
         <div className="max-w-[90%] w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[1200px]">
             <h1 className="text-[64px] leading-[1.1] sm:text-[72px] md:text-[86px] lg:text-[96px] font-display font-semibold text-white tracking-[-0.02em] mb-8">
-              Obviously, <br />we have a
-              {/* <br /> */}
+              Obviously, <br /> we have a
               <span className="text-[#F9A600]"> crystal ball.</span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-200 max-w-2xl font-light">
-              We'll help you Succeed<br />
+            Career Cortex is an AI App to help you find the right career path with personalized insights and expert support.<br />
             </p>
             <div className="mt-12 flex flex-wrap gap-4">
               {/* <Link
