@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createNewChat, chatWithBot, getChatHistory, deleteChat, saveAnalysis, getAnalysisHistory } = require('../controllers/smartBotController');
+const { createNewChat, chatWithBot, getChatHistory, deleteChat, analyzeChat } = require('../controllers/smartBotController');
 const auth = require('../middleware/auth');
 
 // Create a new chat
@@ -12,13 +12,10 @@ router.post('/chat', auth, chatWithBot);
 // Get chat history
 router.get('/history', auth, getChatHistory);
 
+// Analyze a chat
+router.post('/analyze/:chatId', auth, analyzeChat);
+
 // Delete a chat
-router.delete('/chat/:chatId', auth, deleteChat);
-
-// Save analysis
-router.post('/save-analysis', auth, saveAnalysis);
-
-// Get analysis history
-router.get('/analysis-history', auth, getAnalysisHistory);
+router.delete('/:chatId', auth, deleteChat);
 
 module.exports = router; 

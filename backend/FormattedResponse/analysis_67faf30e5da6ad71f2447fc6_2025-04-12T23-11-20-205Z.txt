@@ -1,0 +1,25 @@
+{
+  "chatId": "67faf30e5da6ad71f2447fc6",
+  "timestamp": "2025-04-12T23:11:20.206Z",
+  "analysis": {
+    "skills": {
+      "strategy": 6,
+      "problem_solving": 5,
+      "adventure": 8,
+      "planning": 7,
+      "critical_thinking": 4
+    },
+    "career1": {
+      "title": "Security Consultant",
+      "description": "A security consultant helps organizations protect themselves from potential threats, which might appeal to someone who enjoys strategic planning and problem-solving."
+    },
+    "career2": {
+      "title": "Emergency Response Specialist",
+      "description": "An emergency response specialist responds to and manages emergency situations, which could be a good fit for someone who enjoys adventure and critical thinking."
+    },
+    "career3": {
+      "title": "Investigator",
+      "description": "An investigator gathers and analyzes evidence to solve crimes or other puzzles, which might be a good career path for someone who enjoys planning, strategy, and problem-solving."
+    }
+  }
+}

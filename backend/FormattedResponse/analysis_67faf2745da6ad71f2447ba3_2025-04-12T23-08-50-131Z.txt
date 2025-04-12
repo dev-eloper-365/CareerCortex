@@ -1,0 +1,25 @@
+{
+  "chatId": "67faf2745da6ad71f2447ba3",
+  "timestamp": "2025-04-12T23:08:50.132Z",
+  "analysis": {
+    "skills": {
+      "social_media": 8,
+      "content_creation": 7,
+      "marketing": 6,
+      "communication": 9,
+      "strategy": 5
+    },
+    "career1": {
+      "title": "Social Media Manager",
+      "description": "Responsible for creating and implementing social media strategies to engage with customers, build brand awareness, and drive website traffic."
+    },
+    "career2": {
+      "title": "Digital Marketing Specialist",
+      "description": "Focuses on developing and executing online marketing campaigns to reach target audiences and achieve business goals."
+    },
+    "career3": {
+      "title": "Content Manager",
+      "description": "Oversees the creation, publication, and maintenance of content across various media platforms to attract and retain audiences."
+    }
+  }
+}

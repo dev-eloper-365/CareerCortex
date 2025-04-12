@@ -1,0 +1,25 @@
+{
+  "chatId": "67faf429c4a6c73057dd922a",
+  "timestamp": "2025-04-12T23:16:50.383Z",
+  "analysis": {
+    "skills": {
+      "cloud_computing": 9,
+      "career_development": 8,
+      "communication": 7,
+      "technical_expertise": 6,
+      "problem_solving": 5
+    },
+    "career1": {
+      "title": "Cloud Engineer",
+      "description": "Design, build, and maintain cloud-based systems for organizations, ensuring scalability, security, and efficiency."
+    },
+    "career2": {
+      "title": "Cloud Architect",
+      "description": "Design and build cloud-based systems for organizations, ensuring scalability, security, and efficiency, with a focus on architectural aspects."
+    },
+    "career3": {
+      "title": "DevOps Engineer",
+      "description": "Help organizations improve their development and deployment processes, ensuring faster time-to-market and higher quality products, with a focus on cloud computing and DevOps."
+    }
+  }
+}

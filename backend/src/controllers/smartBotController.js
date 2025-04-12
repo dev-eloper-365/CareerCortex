@@ -1,7 +1,8 @@
 const axios = require('axios');
 const Chat = require('../models/Chat');
 const User = require('../models/User');
-const Analysis = require('../models/Analysis');
+const fs = require('fs');
+const path = require('path');
 
 const SYSTEM_MESSAGE = {
   role: "system",
@@ -245,10 +246,44 @@ const deleteChat = async (req, res) => {
   }
 };
 
-// Add this function to analyze conversation using Groq
-const analyzeConversation = async (conversation, chatId) => {
+const analyzeChat = async (req, res) => {
   try {
-    const analysisPrompt = `Analyze the following conversation and extract insights about the user's interests and potential. Your tasks are:
+    const { chatId } = req.params;
+    const userId = req.user._id;
+
+    // Find the chat
+    const chat = await Chat.findOne({ _id: chatId, sender: userId });
+    
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat not found"
+      });
+    }
+
+    // Create a formatted conversation string
+    const conversation = chat.messages
+      .filter(msg => msg.role !== 'system') // Exclude system messages
+      .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+      .join('\n\n');
+
+    try {
+      // Create logs directory if it doesn't exist
+      const logsDir = path.join(__dirname, '../../logs');
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true });
+      }
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `chat_${chatId}_${timestamp}.txt`;
+      const filePath = path.join(logsDir, filename);
+
+      // Write conversation to file
+      fs.writeFileSync(filePath, conversation, 'utf8');
+
+      // Now analyze the conversation using Groq API
+      const analysisPrompt = `Analyze the following conversation and extract insights about the user's interests and potential. Your tasks are:
 
 Identify 5 relevant skill categories based on the conversation (e.g., tech, creativity, business, research, communication, etc.). You may define any 5 custom skill names that are most applicable to the user's context.
 
@@ -266,7 +301,6 @@ Include a brief description for each career.
 
 Return the result strictly in the following JSON format:
 
-json format:
 {
   "chatId": "${chatId}",
   "timestamp": "${new Date().toISOString()}",
@@ -292,6 +326,7 @@ json format:
     }
   }
 }
+
 Rules:
 
 Use exactly 5 skill categories relevant to the conversation.
@@ -305,104 +340,74 @@ chatId and timestamp should be string fields (you can use placeholders if necess
 Return only valid JSON. No extra explanations, markdown, or formatting.
 
 Conversation to analyze:
-${conversation.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n')}`;
+${conversation}`;
 
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          {
-            role: 'user',
-            content: analysisPrompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
+      // Check if Groq API key is set
+      if (!process.env.GROQ_API_KEY) {
+        console.error('Groq API key is not set');
+        return res.status(500).json({
+          success: false,
+          message: 'Groq API key is not configured',
+          error: 'Missing API key'
+        });
       }
-    );
 
-    const analysisResult = JSON.parse(response.data.choices[0].message.content);
-    return analysisResult;
-  } catch (error) {
-    console.error('Error analyzing conversation:', error);
-    throw error;
-  }
-};
+      // Send request to Groq API
+      const analysisResponse = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            {
+              role: "user",
+              content: analysisPrompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.GROQ_API_KEY}`
+          }
+        }
+      );
 
-// Modify the saveAnalysis function
-const saveAnalysis = async (req, res) => {
-  try {
-    const { chatId } = req.body;
-    const userId = req.user._id;
-    
-    if (!chatId) {
-      return res.status(400).json({
+      // Extract the analysis result
+      const analysisResult = analysisResponse.data.choices[0].message.content;
+
+      // Create FormattedResponse directory if it doesn't exist
+      const formattedResponseDir = path.join(__dirname, '../../FormattedResponse');
+      if (!fs.existsSync(formattedResponseDir)) {
+        fs.mkdirSync(formattedResponseDir, { recursive: true });
+      }
+
+      // Save the formatted response to a file
+      const formattedResponseFilename = `analysis_${chatId}_${timestamp}.txt`;
+      const formattedResponsePath = path.join(formattedResponseDir, formattedResponseFilename);
+      fs.writeFileSync(formattedResponsePath, analysisResult, 'utf8');
+
+      res.json({
+        success: true,
+        message: "Chat analysis saved successfully",
+        filename,
+        formattedResponseFilename
+      });
+    } catch (fileError) {
+      console.error('File operation error:', fileError);
+      return res.status(500).json({
         success: false,
-        message: 'Chat ID is required'
+        message: 'Failed to save chat analysis',
+        error: fileError.message
       });
     }
-
-    // Find the chat and get the conversation
-    const chat = await Chat.findOne({ _id: chatId, sender: userId });
-    if (!chat) {
-      return res.status(404).json({
-        success: false,
-        message: 'Chat not found'
-      });
-    }
-
-    // Analyze the conversation using Groq
-    const analysisResult = await analyzeConversation(chat.messages, chatId);
-
-    // Save the analysis to MongoDB
-    const analysis = new Analysis({
-      chatId: chat._id,
-      userId: userId,
-      timestamp: analysisResult.timestamp,
-      analysis: analysisResult.analysis
-    });
-
-    await analysis.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'Analysis saved successfully',
-      analysis: analysisResult
-    });
   } catch (error) {
-    console.error('Error in saveAnalysis:', error);
-    return res.status(500).json({
+    console.error('Analyze Chat Error:', error);
+    res.status(500).json({
       success: false,
-      message: 'Internal server error'
-    });
-  }
-};
-
-// Add a function to get analysis history
-const getAnalysisHistory = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    
-    const analyses = await Analysis.find({ userId })
-      .sort({ createdAt: -1 })
-      .populate('chatId', 'title');
-
-    return res.status(200).json({
-      success: true,
-      analyses
-    });
-  } catch (error) {
-    console.error('Error getting analysis history:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error'
+      message: 'Failed to analyze chat',
+      error: error.message
     });
   }
 };
@@ -412,6 +417,5 @@ module.exports = {
   chatWithBot,
   getChatHistory,
   deleteChat,
-  saveAnalysis,
-  getAnalysisHistory
+  analyzeChat
 }; 

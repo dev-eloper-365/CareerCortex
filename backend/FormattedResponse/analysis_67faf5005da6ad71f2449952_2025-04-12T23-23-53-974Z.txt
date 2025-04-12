@@ -1,0 +1,25 @@
+{
+  "chatId": "67faf5005da6ad71f2449952",
+  "timestamp": "2025-04-12T23:23:53.975Z",
+  "analysis": {
+    "skills": {
+      "space_exploration": 9,
+      "physical_sciences": 8,
+      "mathematics": 7,
+      "computer_science": 6,
+      "research_analysis": 5
+    },
+    "career1": {
+      "title": "Astronomer",
+      "description": "A scientist who studies the universe, stars, planets, and galaxies to understand their composition, behavior, and evolution."
+    },
+    "career2": {
+      "title": "Astrophysicist",
+      "description": "A physicist who applies the principles of physics to the study of celestial objects and phenomena, such as stars, galaxies, and black holes."
+    },
+    "career3": {
+      "title": "Planetary Scientist",
+      "description": "A scientist who studies the planets, moons, asteroids, and comets in our solar system and beyond, focusing on their composition, geology, and potential for life."
+    }
+  }
+}
