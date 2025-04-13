@@ -3,6 +3,7 @@ const Chat = require('../models/Chat');
 const User = require('../models/User');
 const fs = require('fs');
 const path = require('path');
+const Analysis = require('../models/Analysis');
 
 const SYSTEM_MESSAGE = {
   role: "system",
@@ -162,7 +163,8 @@ const chatWithBot = async (req, res) => {
 
       await chat.save();
       console.log('Chat saved successfully');
-
+      
+      analyzeChat(chatId,userId);
       // Create logs directory if it doesn't exist
       const logsDir = path.join(__dirname, '../../logs');
       if (!fs.existsSync(logsDir)) {
@@ -266,10 +268,8 @@ const deleteChat = async (req, res) => {
   }
 };
 
-const analyzeChat = async (req, res) => {
+const analyzeChat = async (chatId,userId) => {
   try {
-    const { chatId } = req.params;
-    const userId = req.user._id;
 
     // Find the chat
     const chat = await Chat.findOne({ _id: chatId, sender: userId });
@@ -408,12 +408,20 @@ ${conversation}`;
       const formattedResponsePath = path.join(formattedResponseDir, formattedResponseFilename);
       fs.writeFileSync(formattedResponsePath, analysisResult, 'utf8');
 
-      res.json({
-        success: true,
-        message: "Chat analysis saved successfully",
-        filename,
-        formattedResponseFilename
+      // Store the analysis in MongoDB
+      const analysis = new Analysis({
+        chatId: chatId,
+        timestamp: timestamp,
+        analysis: JSON.parse(analysisResult)
       });
+      await analysis.save();
+
+      // res.json({
+      //   success: true,
+      //   message: "Chat analysis saved successfully",
+      //   filename,
+      //   formattedResponseFilename
+      // });
     } catch (fileError) {
       console.error('File operation error:', fileError);
       return res.status(500).json({
@@ -664,7 +672,7 @@ ${chatLog}`;
     );
 
     const analysisResult = response.data.choices[0].message.content;
-
+    console.log('Analysis result:', analysisResult);
     // Create FormattedLogs directory if it doesn't exist
     const formattedLogsDir = path.join(__dirname, '../../FormattedLogs');
     if (!fs.existsSync(formattedLogsDir)) {
@@ -675,7 +683,7 @@ ${chatLog}`;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const formattedLogPath = path.join(formattedLogsDir, `analysis_${timestamp}.json`);
     fs.writeFileSync(formattedLogPath, analysisResult, 'utf8');
-
+      
     console.log('Analysis saved successfully:', formattedLogPath);
     return analysisResult;
   } catch (error) {
@@ -693,4 +701,4 @@ module.exports = {
   processPDF,
   processImage,
   analyzeChatLog
-}; 
+};

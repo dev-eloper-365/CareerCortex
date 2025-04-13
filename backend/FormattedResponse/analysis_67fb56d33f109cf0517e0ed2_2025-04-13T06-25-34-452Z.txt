@@ -1,0 +1,25 @@
+{
+  "chatId": "67fb56d33f109cf0517e0ed2",
+  "timestamp": "2025-04-13T06:25:34.453Z",
+  "analysis": {
+    "skills": {
+      "data_analysis": 6,
+      "sales_management": 8,
+      "leadership": 7,
+      "communication": 9,
+      "strategic_thinking": 5
+    },
+    "career1": {
+      "title": "Sales Manager",
+      "description": "Leading a team of sales professionals to drive revenue growth and achieve business objectives"
+    },
+    "career2": {
+      "title": "Business Development Manager",
+      "description": "Identifying new business opportunities and developing strategies to pursue them"
+    },
+    "career3": {
+      "title": "Account Manager",
+      "description": "Managing existing customer relationships and identifying opportunities to upsell or cross-sell products or services"
+    }
+  }
+}

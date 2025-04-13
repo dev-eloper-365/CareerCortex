@@ -29,11 +29,21 @@ router.post('/process-image', auth, fileUpload(), processImage);
 router.post('/analyze-log', auth, async (req, res) => {
   try {
     const result = await analyzeChatLog();
-    res.json({
-      success: true,
-      message: 'Chat log analyzed successfully',
-      result
-    });
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Chat log analyzed successfully and saved to database',
+        analysisId: result.analysisId,
+        filePath: result.filePath
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to analyze chat log',
+        error: result.error
+      });
+    }
   } catch (error) {
     console.error('Error analyzing chat log:', error);
     res.status(500).json({
