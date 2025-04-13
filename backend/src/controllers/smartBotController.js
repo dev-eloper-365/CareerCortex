@@ -163,9 +163,29 @@ const chatWithBot = async (req, res) => {
       await chat.save();
       console.log('Chat saved successfully');
 
+      // Create logs directory if it doesn't exist
+      const logsDir = path.join(__dirname, '../../logs');
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true });
+      }
+
+      // Use a single log file
+      const filePath = path.join(logsDir, 'chat_log.txt');
+
+      // Format the conversation
+      const logContent = `=== Chat ID: ${chatId} ===\n` +
+        `Timestamp: ${new Date().toISOString()}\n` +
+        `User: ${message}\n` +
+        `Assistant: ${formattedResponse}\n` +
+        '===================================\n\n';
+
+      // Write conversation to file (overwrite existing content)
+      fs.writeFileSync(filePath, logContent);
+
       res.json({
         success: true,
-        message: formattedResponse
+        response: formattedResponse,
+        chatId
       });
     } catch (apiError) {
       console.error('Groq API Error:', apiError.response?.data || apiError.message);
@@ -420,6 +440,7 @@ const processPDF = async (req, res) => {
 
     const pdfFile = req.files.pdf;
     const instructions = req.body.instructions || '';
+    const chatId = req.body.chatId;
 
     // Convert PDF file to base64
     const pdfBase64 = pdfFile.data.toString('base64');
@@ -442,17 +463,224 @@ const processPDF = async (req, res) => {
     const combinedText = `${extractedText}\n\nUser Instructions: ${instructions}`;
 
     // Send the combined text to the chat
-    const chatResponse = await chatWithBot(req, {
-      body: {
-        message: combinedText,
-        chatId: req.body.chatId
-      }
-    });
+    if (chatId) {
+      // Create a mock response object
+      const mockRes = {
+        json: (data) => {
+          res.json(data);
+        },
+        status: (code) => {
+          return {
+            json: (data) => {
+              res.status(code).json(data);
+            }
+          };
+        }
+      };
 
-    res.json(chatResponse);
+      // Call chatWithBot with the combined text
+      await chatWithBot({
+        ...req,
+        body: {
+          message: combinedText,
+          chatId: chatId
+        }
+      }, mockRes);
+    } else {
+      res.json({
+        success: true,
+        message: `I've processed your PDF. Here's what I found: ${extractedText.substring(0, 200)}...`,
+        extractedText,
+      });
+    }
   } catch (error) {
     console.error('Error processing PDF:', error);
     res.status(500).json({ error: 'Failed to process PDF file' });
+  }
+};
+
+const processImage = async (req, res) => {
+  try {
+    if (!req.files || !req.files.image) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
+
+    const imageFile = req.files.image;
+    const instructions = req.body.instructions || '';
+    const chatId = req.body.chatId;
+
+    // Convert image file to base64
+    const imageBase64 = imageFile.data.toString('base64');
+
+    // Call PDF.co API to extract text from image using OCR
+    const response = await axios.post('https://api.pdf.co/v1/ocr/recognize', {
+      url: `data:image/jpeg;base64,${imageBase64}`,
+      apiKey: process.env.PDF_CO_API_KEY,
+      language: 'eng', // Default to English
+      output: 'text'
+    });
+
+    if (!response.data || !response.data.url) {
+      throw new Error('Failed to extract text from image');
+    }
+
+    // Get the extracted text
+    const textResponse = await axios.get(response.data.url);
+    const extractedText = textResponse.data;
+
+    // Combine extracted text with user instructions
+    const combinedText = `${extractedText}\n\nUser Instructions: ${instructions}`;
+
+    // Send the combined text to the chat
+    if (chatId) {
+      // Create a mock response object
+      const mockRes = {
+        json: (data) => {
+          res.json(data);
+        },
+        status: (code) => {
+          return {
+            json: (data) => {
+              res.status(code).json(data);
+            }
+          };
+        }
+      };
+
+      // Call chatWithBot with the combined text
+      await chatWithBot({
+        ...req,
+        body: {
+          message: combinedText,
+          chatId: chatId
+        }
+      }, mockRes);
+    } else {
+      res.json({
+        success: true,
+        message: `I've processed your image. Here's what I found: ${extractedText.substring(0, 200)}...`,
+        extractedText,
+      });
+    }
+  } catch (error) {
+    console.error('Error processing image:', error);
+    res.status(500).json({ error: 'Failed to process image file' });
+  }
+};
+
+const analyzeChatLog = async () => {
+  try {
+    // Read the chat log file
+    const logsDir = path.join(__dirname, '../../logs');
+    const logFilePath = path.join(logsDir, 'chat_log.txt');
+    
+    if (!fs.existsSync(logFilePath)) {
+      console.error('Chat log file not found');
+      return;
+    }
+
+    const chatLog = fs.readFileSync(logFilePath, 'utf8');
+
+    // Prepare the prompt with the chat log
+    const analysisPrompt = `Analyze the following conversation and extract insights about the user's interests and potential. Your tasks are:
+
+Identify 5 relevant skill categories based on the conversation (e.g., tech, creativity, business, research, communication, etc.). You may define any 5 custom skill names that are most applicable to the user's context.
+
+Score each skill as an integer from 0 to 10 (do not use /10 or any extra text).
+
+Suggest 3 career paths based on the conversation:
+
+career1: the most suitable career.
+
+career2: a closely related alternate career.
+
+career3: another alternate career in the same domain.
+
+Include a brief description for each career.
+
+Return the result strictly in the following JSON format:
+
+{
+  "chatId": "chat_id_here",
+  "timestamp": "current_timestamp",
+  "analysis": {
+    "skills": {
+      "skill_1": x,
+      "skill_2": x,
+      "skill_3": x,
+      "skill_4": x,
+      "skill_5": x
+    },
+    "career1": {
+      "title": "Career Title Here",
+      "description": "Brief description of the career1"
+    },
+    "career2": {
+      "title": "Career Title Here",
+      "description": "Brief description of the career2"
+    },
+    "career3": {
+      "title": "Career Title Here",
+      "description": "Brief description of the career3"
+    }
+  }
+}
+
+Rules:
+
+Use exactly 5 skill categories relevant to the conversation.
+
+Skill values must be plain integers (e.g., "tech": 8), not strings, and must not exceed 10.
+
+Each career must include a title and a description.
+
+chatId and timestamp should be string fields (you can use placeholders if necessary).
+
+Return only valid JSON. No extra explanations, markdown, or formatting.
+
+Conversation to analyze:
+${chatLog}`;
+
+    // Send to Groq API
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'user',
+            content: analysisPrompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+        }
+      }
+    );
+
+    const analysisResult = response.data.choices[0].message.content;
+
+    // Create FormattedLogs directory if it doesn't exist
+    const formattedLogsDir = path.join(__dirname, '../../FormattedLogs');
+    if (!fs.existsSync(formattedLogsDir)) {
+      fs.mkdirSync(formattedLogsDir, { recursive: true });
+    }
+
+    // Save the formatted response
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const formattedLogPath = path.join(formattedLogsDir, `analysis_${timestamp}.json`);
+    fs.writeFileSync(formattedLogPath, analysisResult, 'utf8');
+
+    console.log('Analysis saved successfully:', formattedLogPath);
+    return analysisResult;
+  } catch (error) {
+    console.error('Error analyzing chat log:', error);
+    throw error;
   }
 };
 
@@ -462,5 +690,7 @@ module.exports = {
   getChatHistory,
   deleteChat,
   analyzeChat,
-  processPDF
+  processPDF,
+  processImage,
+  analyzeChatLog
 }; 

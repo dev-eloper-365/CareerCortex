@@ -30,7 +30,7 @@ const upload = multer({
 });
 
 // Routes for PDF and image processing
-router.post('/process-pdf', upload.single('file'), pdfController.processPdf);
+router.post('/process-pdf', upload.single('file'), pdfController.processPDF);
 router.post('/process-image', upload.single('file'), pdfController.processImage);
 
 module.exports = router; 

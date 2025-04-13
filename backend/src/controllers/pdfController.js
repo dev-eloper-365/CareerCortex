@@ -1,66 +1,136 @@
 const axios = require('axios');
-const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
+const FormData = require('form-data');
 
 const processPdf = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No PDF file uploaded' });
+      return res.status(400).json({ success: false, message: 'No PDF file uploaded' });
     }
 
-    const pdfPath = req.file.path;
-    const message = req.body.message || '';
-
-    // Create form data for PDF.co API
+    // Step 1: Upload the file to PDF.co
     const formData = new FormData();
-    formData.append('file', fs.createReadStream(pdfPath));
-    formData.append('api_key', process.env.PDF_CO_API_KEY);
+    formData.append('file', fs.createReadStream(req.file.path));
 
-    // Upload PDF to PDF.co
-    const uploadResponse = await axios.post('https://api.pdf.co/v1/file/upload', formData, {
-      headers: {
-        ...formData.getHeaders(),
+    const uploadRes = await axios.post(
+      'https://api.pdf.co/v1/file/upload',
+      formData,
+      {
+        headers: {
+          'x-api-key': process.env.PDF_CO_API_KEY,
+          ...formData.getHeaders()
+        }
+      }
+    );
+
+    if (!uploadRes.data.url) {
+      throw new Error('Failed to upload file to PDF.co');
+    }
+
+    const fileUrl = uploadRes.data.url;
+
+    // Step 2: Convert PDF to text
+    const convertRes = await axios.post(
+      'https://api.pdf.co/v1/pdf/convert/to/text',
+      {
+        url: fileUrl,
+        inline: true
       },
-    });
+      {
+        headers: { 'x-api-key': process.env.PDF_CO_API_KEY }
+      }
+    );
 
-    if (!uploadResponse.data.url) {
-      throw new Error('Failed to upload PDF to PDF.co');
-    }
+    // Clean up uploaded file
+    fs.unlinkSync(req.file.path);
 
-    const pdfUrl = uploadResponse.data.url;
-
-    // Extract text from PDF
-    const extractResponse = await axios.post('https://api.pdf.co/v1/pdf/convert/to/text', {
-      url: pdfUrl,
-      api_key: process.env.PDF_CO_API_KEY,
-    });
-
-    if (!extractResponse.data.url) {
-      throw new Error('Failed to extract text from PDF');
-    }
-
-    // Download the extracted text
-    const textResponse = await axios.get(extractResponse.data.url);
-    const extractedText = textResponse.data;
-
-    // Clean up temporary file
-    fs.unlinkSync(pdfPath);
-
-    // Process the extracted text with your existing chat logic
-    // TODO: Integrate with your chat processing logic
-
+    // Return the extracted text
     res.json({
-      message: `I've processed your PDF. Here's what I found: ${extractedText.substring(0, 200)}...`,
-      extractedText,
+      success: true,
+      text: convertRes.data.body
     });
+
   } catch (error) {
     console.error('Error processing PDF:', error);
-    res.status(500).json({ error: 'Failed to process PDF' });
+    
+    // Clean up uploaded file in case of error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.message || 'Failed to process PDF'
+    });
+  }
+};
+
+const processImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No image file uploaded' });
+    }
+
+    // Step 1: Upload the file to PDF.co
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(req.file.path));
+
+    const uploadRes = await axios.post(
+      'https://api.pdf.co/v1/file/upload',
+      formData,
+      {
+        headers: {
+          'x-api-key': process.env.PDF_CO_API_KEY,
+          ...formData.getHeaders()
+        }
+      }
+    );
+
+    if (!uploadRes.data.url) {
+      throw new Error('Failed to upload file to PDF.co');
+    }
+
+    const fileUrl = uploadRes.data.url;
+
+    // Step 2: Extract text from image using OCR
+    const convertRes = await axios.post(
+      'https://api.pdf.co/v1/ocr/recognize',
+      {
+        url: fileUrl,
+        inline: true,
+        language: 'eng'
+      },
+      {
+        headers: { 'x-api-key': process.env.PDF_CO_API_KEY }
+      }
+    );
+
+    // Clean up uploaded file
+    fs.unlinkSync(req.file.path);
+
+    // Return the extracted text
+    res.json({
+      success: true,
+      text: convertRes.data.body
+    });
+
+  } catch (error) {
+    console.error('Error processing image:', error);
+    
+    // Clean up uploaded file in case of error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.message || 'Failed to process image'
+    });
   }
 };
 
 module.exports = {
   processPdf,
+  processImage
 }; 

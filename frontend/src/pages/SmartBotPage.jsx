@@ -4,7 +4,6 @@ import { ArrowLeftIcon, ChatBubbleLeftRightIcon, TrashIcon, PaperClipIcon, XMark
 import { Link, useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import { createWorker } from 'tesseract.js';
-import * as pdfjsLib from 'pdfjs-dist';
 
 const SmartBotPage = () => {
   const [messages, setMessages] = useState([]);
@@ -153,36 +152,77 @@ const SmartBotPage = () => {
     }
   };
 
-  const extractTextFromImage = async (file) => {
-    setIsProcessingFile(true);
+  const extractTextFromPDF = async (file) => {
     try {
-      const worker = await createWorker();
-      const { data: { text } } = await worker.recognize(file);
-      await worker.terminate();
-      return text;
+      // First, upload the file to get a URL
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload file to backend
+      const uploadResponse = await axios.post('http://localhost:5000/api/pdf/process-pdf', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (!uploadResponse.data.success) {
+        throw new Error(uploadResponse.data.message || 'Failed to upload file');
+      }
+
+      return uploadResponse.data.text;
     } catch (error) {
-      console.error('Error extracting text from image:', error);
-      toast.error('Failed to extract text from image');
+      console.error('Error extracting text from PDF:', error);
+      let errorMessage = 'Failed to extract text from PDF';
+      
+      if (error.response?.status === 400) {
+        errorMessage = 'Invalid PDF file. Please check if the file is corrupted.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Please log in again to process files.';
+        navigate('/login');
+      } else if (error.response?.status === 402) {
+        errorMessage = 'Not enough credits to process the file.';
+      }
+      
+      toast.error(errorMessage);
       return '';
     }
   };
 
-  const extractTextFromPDF = async (file) => {
+  const extractTextFromImage = async (file) => {
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let text = '';
+      // First, upload the file to get a URL
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload file to backend
+      const uploadResponse = await axios.post('http://localhost:5000/api/pdf/process-image', formData, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (!uploadResponse.data.success) {
+        throw new Error(uploadResponse.data.message || 'Failed to upload file');
+      }
+
+      // Get the extracted text from the backend
+      const textResponse = await axios.get(uploadResponse.data.url);
+      return textResponse.data;
+    } catch (error) {
+      console.error('Error extracting text from image:', error);
+      let errorMessage = 'Failed to extract text from image';
       
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map(item => item.str).join(' ');
+      if (error.response?.status === 400) {
+        errorMessage = 'Invalid image file. Please check if the file is corrupted.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Please log in again to process files.';
+        navigate('/login');
+      } else if (error.response?.status === 402) {
+        errorMessage = 'Not enough credits to process the file.';
       }
       
-      return text;
-    } catch (error) {
-      console.error('Error extracting text from PDF:', error);
-      toast.error('Failed to extract text from PDF');
+      toast.error(errorMessage);
       return '';
     }
   };
