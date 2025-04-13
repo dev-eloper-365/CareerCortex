@@ -23,6 +23,7 @@ app.use(express.json());
 // Import routes
 const smartBotRoutes = require('./routes/smartBotRoutes');
 const authRoutes = require('./routes/authRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 // Routes
 app.get('/', (req, res) => {
@@ -32,6 +33,7 @@ app.get('/', (req, res) => {
 // Use routes
 app.use('/api/smart-bot', smartBotRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

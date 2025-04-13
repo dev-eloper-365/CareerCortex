@@ -1,10 +1,49 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { ArrowLeftIcon, ChatBubbleLeftRightIcon, TrashIcon, PaperClipIcon, XMarkIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { 
+  ArrowLeftIcon, 
+  ChatBubbleLeftRightIcon, 
+  TrashIcon, 
+  PaperClipIcon, 
+  XMarkIcon, 
+  ChartBarIcon, 
+  PaperAirplaneIcon, 
+  DocumentIcon, 
+  PhotoIcon,
+  Bars3Icon,
+  UserCircleIcon,
+  SparklesIcon
+} from '@heroicons/react/24/outline';
 import { Link, useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
 import { createWorker } from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const SYSTEM_MESSAGE = {
+  role: 'assistant',
+  content: `Hello! I am your AI career assistant. I specialize in:
+
+1. Career Guidance
+   - Career path recommendations
+   - Industry insights
+   - Job market trends
+   - Skill development advice
+
+2. Resume Analysis
+   - Detailed feedback on your resume
+   - ATS optimization tips
+   - Formatting suggestions
+   - Content improvement recommendations
+
+3. Interview Preparation
+   - Common interview questions
+   - Industry-specific questions
+   - Behavioral interview tips
+   - Technical interview guidance
+
+Please share your resume or ask specific questions about your career goals, and I'll provide detailed, accurate advice tailored to your needs.`
+};
 
 const SmartBotPage = () => {
   const [messages, setMessages] = useState([]);
@@ -21,44 +60,31 @@ const SmartBotPage = () => {
   const [filePreview, setFilePreview] = useState(null);
   const [currentFile, setCurrentFile] = useState(null);
   const [conversationHistory, setConversationHistory] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [openMenu, setOpenMenu] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [theme, setTheme] = useState('light');
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, autoScroll]);
 
   useEffect(() => {
-    // Check authentication
     const token = localStorage.getItem('token');
     if (!token) {
       navigate('/login');
       return;
     }
 
-    // Load chat history and create new chat if needed
-    const initializeChat = async () => {
-      try {
-        console.log('Initializing chat...');
-        await loadChatHistory();
-        
-        // If no active chat, create a new one
-        if (!chatId) {
-          console.log('No active chat found, creating new chat...');
-          await startNewChat();
-        }
-      } catch (error) {
-        console.error('Error initializing chat:', error);
-        if (error.response?.status === 401) {
-          navigate('/login');
-        }
-      }
-    };
-    
-    initializeChat();
-    
+    // Create a new chat every time the component mounts
+    createNewChat(false); // Pass false to prevent toast message
+
     // Check if we're on mobile and hide sidebar by default
     const checkMobile = () => {
       if (window.innerWidth < 768) {
@@ -70,6 +96,9 @@ const SmartBotPage = () => {
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
+    
+    // Load chat history
+    loadChatHistory();
     
     return () => {
       window.removeEventListener('resize', checkMobile);
@@ -85,7 +114,6 @@ const SmartBotPage = () => {
       });
       if (response.data.success) {
         setChatHistory(response.data.chats);
-        // If there are chats, set the most recent one as active
         if (response.data.chats.length > 0) {
           const mostRecentChat = response.data.chats[0];
           setChatId(mostRecentChat._id);
@@ -100,131 +128,103 @@ const SmartBotPage = () => {
     }
   };
 
-  const startNewChat = async () => {
+  const createNewChat = async (showToast = true) => {
     try {
-      console.log('Creating new chat...');
       const response = await axios.post('http://localhost:5000/api/smart-bot/new', {}, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
 
-      console.log('New chat response:', response.data);
-      
       if (response.data.success) {
-        // Clear current chat state
-        setMessages([]);
         setChatId(response.data.chatId);
-        setConversationHistory([]);
-        
-        // Refresh chat history
-        await loadChatHistory();
-        
-        // On mobile, hide sidebar after starting a new chat
-        if (window.innerWidth < 768) {
-          setShowSidebar(false);
+        setMessages([SYSTEM_MESSAGE]);
+        setConversationHistory([SYSTEM_MESSAGE]);
+        setInput('');
+        setFileContent('');
+        setFilePreview(null);
+        setCurrentFile(null);
+        if (showToast) {
+          toast.success('New conversation started', {
+            icon: '✨',
+            style: {
+              borderRadius: '10px',
+              background: '#333',
+              color: '#fff',
+            },
+          });
         }
-
-        console.log('New chat created with ID:', response.data.chatId);
-        toast.success('New chat started successfully');
-      } else {
-        console.error('Failed to create new chat:', response.data);
-        toast.error('Failed to create new chat. Please try again.');
       }
     } catch (error) {
-      console.error('Error creating new chat:', error.response?.data || error.message);
+      console.error('Error creating new chat:', error);
       if (error.response?.status === 401) {
         navigate('/login');
       } else {
-        toast.error('Failed to create new chat. Please try again.');
+        toast.error('Failed to create new chat');
       }
     }
   };
 
   const handleNewChat = async () => {
-    try {
-      // Clear current state first
-      setMessages([]);
-      setChatId(null);
-      setInput('');
-      
-      // Create new chat
-      await startNewChat();
-    } catch (error) {
-      console.error('Error handling new chat:', error);
-    }
-  };
-
-  const extractTextFromImage = async (file) => {
-    setIsProcessingFile(true);
-    try {
-      const worker = await createWorker();
-      const { data: { text } } = await worker.recognize(file);
-      await worker.terminate();
-      return text;
-    } catch (error) {
-      console.error('Error extracting text from image:', error);
-      toast.error('Failed to extract text from image');
-      return '';
-    }
-  };
-
-  const extractTextFromPDF = async (file) => {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let text = '';
-      
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map(item => item.str).join(' ');
-      }
-      
-      return text;
-    } catch (error) {
-      console.error('Error extracting text from PDF:', error);
-      toast.error('Failed to extract text from PDF');
-      return '';
-    }
+    await createNewChat(true); // Pass true to show toast message
   };
 
   const handleFileUpload = async (event) => {
-    const file = event.target.files?.[0];
+    const file = event.target.files[0];
     if (!file) return;
 
-    // Create preview URL for images
-    if (file.type.includes('image')) {
-      setFilePreview(URL.createObjectURL(file));
-    } else if (file.type === 'application/pdf') {
-      setFilePreview('pdf');
-    }
-    
     setCurrentFile(file);
     setIsProcessingFile(true);
+
+    // Create preview for image files
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreview(null);
+    }
 
     try {
       let extractedText = '';
       
-      if (file.type.includes('image')) {
-        extractedText = await extractTextFromImage(file);
+      if (file.type.startsWith('image/')) {
+        // Process image using Tesseract.js
+        const worker = await createWorker();
+        const { data: { text } } = await worker.recognize(file);
+        await worker.terminate();
+        extractedText = text;
       } else if (file.type === 'application/pdf') {
-        extractedText = await extractTextFromPDF(file);
+        // Process PDF using pdf.js
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let text = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map(item => item.str).join(' ');
+        }
+        
+        extractedText = text;
       } else {
         toast.error('Unsupported file type. Please upload an image or PDF.');
         return;
       }
 
       if (extractedText) {
-        // Store the extracted text but don't show it
         setFileContent(extractedText);
-        toast.success('File processed successfully!');
+        toast.success('File processed successfully!', {
+          icon: '🎉',
+        });
       } else {
-        toast.error('Could not process file');
+        toast.error('Could not extract text from file');
       }
     } catch (error) {
       console.error('Error processing file:', error);
-      toast.error('Error processing file');
+      toast.error('Failed to process file');
     } finally {
       setIsProcessingFile(false);
     }
@@ -257,34 +257,61 @@ const SmartBotPage = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    toast.success('Conversation saved to file', {
+      icon: '📄',
+    });
+  };
+
+  const simulateTyping = (message, callback) => {
+    setIsTyping(true);
+    
+    // Show typing indicator for a minimum time
+    setTimeout(() => {
+      setIsTyping(false);
+      callback(message);
+    }, Math.max(1500, message.length * 20)); // Minimum 1.5s or 20ms per character
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if ((!input.trim() && !fileContent) || !chatId || isProcessingFile) return;
+    if (!input.trim() && !fileContent) return;
 
-    // Display message - only shows user's instruction and file preview
+    // Create display message (what user sees)
     const displayMessage = {
       role: 'user',
-      content: input.trim() || "Please analyze this file.",
-      filePreview: filePreview,
-      fileName: currentFile?.name,
-      fileType: currentFile?.type
+      content: input,
+      file: currentFile ? {
+        name: currentFile.name,
+        type: currentFile.type,
+        preview: filePreview
+      } : null
     };
 
-    // Add user message to chat and conversation history
+    // Create backend message with enhanced context
+    const backendMessage = {
+      role: 'user',
+      content: `Context: I am a career assistant specializing in career guidance, resume analysis, and interview preparation.
+User Query: ${input}
+${fileContent ? `\n\nFile Content:\n${fileContent}` : ''}
+Please provide a detailed, accurate response focusing on career-related advice.`
+    };
+
+    // Add only the display message to chat
     setMessages(prev => [...prev, displayMessage]);
     setConversationHistory(prev => [...prev, displayMessage]);
+    
+    setInput('');
+    setFileContent('');
+    setFilePreview(null);
+    setCurrentFile(null);
     setIsLoading(true);
 
     try {
-      // Send both instruction and extracted text to backend
       const response = await axios.post(
-        'http://localhost:5000/api/smart-bot/chat', 
+        'http://localhost:5000/api/smart-bot/chat',
         {
-          message: fileContent 
-            ? `${input.trim()}\n\nFile Content:\n${fileContent}`
-            : input.trim(),
+          message: backendMessage.content,
           chatId
         },
         {
@@ -295,32 +322,25 @@ const SmartBotPage = () => {
       );
 
       if (response.data.success) {
-        // Add AI response to chat and conversation history
-        const assistantMessage = { 
-          role: 'assistant', 
-          content: response.data.message 
+        const assistantMessage = {
+          role: 'assistant',
+          content: response.data.message
         };
-        setMessages(prev => [...prev, assistantMessage]);
-        setConversationHistory(prev => [...prev, assistantMessage]);
-        loadChatHistory();
+        
+        // Simulate typing
+        simulateTyping(assistantMessage, (typedMessage) => {
+          setMessages(prev => [...prev, typedMessage]);
+          setConversationHistory(prev => [...prev, typedMessage]);
+        });
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error sending message:', error);
       if (error.response?.status === 401) {
         navigate('/login');
       } else {
-        toast.error('Failed to get response');
-        const errorMessage = { 
-          role: 'assistant', 
-          content: 'Sorry, I encountered an error. Please try again.' 
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        setConversationHistory(prev => [...prev, errorMessage]);
+        toast.error('Failed to send message');
       }
     } finally {
-      setInput('');
-      setFileContent('');
-      clearFileUpload();
       setIsLoading(false);
     }
   };
@@ -372,389 +392,348 @@ const SmartBotPage = () => {
     }
   };
 
-  const handleEndConversation = async () => {
-    if (conversationHistory.length > 0) {
-      try {
-        // First save the conversation
-        await axios.post(
-          'http://localhost:5000/api/smart-bot/save-conversation',
-          {
-            conversation: conversationHistory,
-            chatId
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          }
-        );
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
 
-        // Then send for analysis
-        const analysisPrompt = `Analyze the following conversation and extract insights about the user's interests and potential. Your tasks are:
+  const sidebarVariants = {
+    open: { x: 0, transition: { type: "spring", stiffness: 300, damping: 30 } },
+    closed: { x: "-100%", transition: { type: "spring", stiffness: 300, damping: 30 } }
+  };
 
-Identify 5 relevant skill categories based on the conversation (e.g., tech, creativity, business, research, communication, etc.). You may define any 5 custom skill names that are most applicable to the user's context.
-
-Score each skill as an integer from 0 to 10 (do not use /10 or any extra text).
-
-Suggest 3 career paths based on the conversation:
-
-career1: the most suitable career.
-
-career2: a closely related alternate career.
-
-career3: another alternate career in the same domain.
-
-Include a brief description for each career.
-
-Return the result strictly in the following JSON format:
-
-json format:
-{
-  "chatId": "${chatId}",
-  "timestamp": "${new Date().toISOString()}",
-  "analysis": {
-    "skills": {
-      "skill_1": x,
-      "skill_2": x,
-      "skill_3": x,
-      "skill_4": x,
-      "skill_5": x
+  const messageContainerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { type: "spring", stiffness: 500, damping: 30 }
     },
-    "career1": {
-      "title": "Career Title Here",
-      "description": "Brief description of the career1"
-    },
-    "career2": {
-      "title": "Career Title Here",
-      "description": "Brief description of the career2"
-    },
-    "career3": {
-      "title": "Career Title Here",
-      "description": "Brief description of the career3"
-    }
-  }
-}
-Rules:
-
-Use exactly 5 skill categories relevant to the conversation.
-
-Skill values must be plain integers (e.g., "tech": 8), not strings, and must not exceed 10.
-
-Each career must include a title and a description.
-
-chatId and timestamp should be string fields (you can use placeholders if necessary).
-
-Return only valid JSON. No extra explanations, markdown, or formatting.
-
-Conversation to analyze:
-${conversationHistory.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n')}`;
-
-        const analysisResponse = await axios.post(
-          'http://localhost:5000/api/smart-bot/chat',
-          {
-            message: analysisPrompt,
-            chatId
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          }
-        );
-
-        if (analysisResponse.data.success) {
-          try {
-            const analysisResult = JSON.parse(analysisResponse.data.message);
-            // Send analysis result to backend to save in MongoDB
-            await axios.post(
-              'http://localhost:5000/api/smart-bot/save-analysis',
-              {
-                analysis: analysisResult,
-                chatId
-              },
-              {
-                headers: {
-                  'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-              }
-            );
-            toast.success('Analysis completed and saved successfully');
-          } catch (error) {
-            console.error('Error handling analysis result:', error);
-            toast.error('Analysis completed but failed to save result');
-          }
-        }
-      } catch (error) {
-        console.error('Error in analysis process:', error);
-        toast.error('Failed to complete analysis');
-      }
-    }
-    // Create a new chat before navigating to dashboard
-    await startNewChat();
-    navigate('/dashboard');
+    exit: { opacity: 0, y: -20, transition: { duration: 0.2 } }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`h-screen flex flex-col ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
       <Toaster 
         position="top-right"
         toastOptions={{
           success: {
             style: {
-              background: '#4ade80',
+              background: theme === 'dark' ? '#10B981' : '#4ade80',
               color: 'white',
+              borderRadius: '12px',
+              padding: '16px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            },
+            iconTheme: {
+              primary: 'white',
+              secondary: theme === 'dark' ? '#10B981' : '#4ade80',
             },
           },
           error: {
             style: {
-              background: '#ef4444',
+              background: theme === 'dark' ? '#EF4444' : '#ef4444',
               color: 'white',
+              borderRadius: '12px',
+              padding: '16px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
             },
           },
           loading: {
             style: {
-              background: '#3b82f6',
+              background: theme === 'dark' ? '#3B82F6' : '#3b82f6',
               color: 'white',
+              borderRadius: '12px',
+              padding: '16px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
             },
           },
         }}
       />
+      
       {/* Header */}
-      <div className="bg-blue-600 text-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link to="/" className="mr-4">
-                <ArrowLeftIcon className="h-6 w-6" />
-              </Link>
-              <h1 className="text-2xl font-bold">Career Guidance Assistant</h1>
+      <div className={`${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b shadow-sm z-10`}>
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={toggleSidebar}
+              className={`p-2 rounded-full hover:bg-${theme === 'dark' ? 'gray-700' : 'gray-100'} transition-colors`}
+            >
+              <Bars3Icon className={`h-6 w-6 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-600'}`} />
+            </button>
+            <div className="flex items-center">
+              <SparklesIcon className={`h-7 w-7 mr-2 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+              <h1 className="text-xl font-bold">AI Career Assistant</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <button 
-                onClick={handleEndConversation}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
-              >
-                <span>Analyze Conversation</span>
-                <ChartBarIcon className="h-5 w-5" />
-              </button>
-              <button 
-                onClick={toggleSidebar}
-                className="md:hidden p-2 rounded-full hover:bg-blue-700 transition-colors"
-              >
-                <ChatBubbleLeftRightIcon className="h-6 w-6" />
-              </button>
-            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-full ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            
+            <button
+              onClick={saveConversationToFile}
+              className={`p-2 rounded-full ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}
+              title="Save conversation"
+            >
+              <DocumentIcon className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col md:flex-row h-[calc(100vh-12rem)]">
-          {/* Chat History Sidebar */}
-          <div 
-            className={`${
-              showSidebar ? 'block' : 'hidden'
-            } md:block w-full md:w-1/4 border-r p-4 overflow-y-auto bg-gray-50`}
-          >
-            <button
-              onClick={handleNewChat}
-              className="w-full mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <AnimatePresence>
+          {showSidebar && (
+            <motion.div
+              initial="closed"
+              animate="open"
+              exit="closed"
+              variants={sidebarVariants}
+              className={`${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r w-72 flex-shrink-0 overflow-y-auto z-20 absolute md:relative h-full`}
             >
-              New Chat
-            </button>
-            <div className="space-y-2">
-              {chatHistory.length === 0 ? (
-                <div className="text-center text-gray-500 py-4">
-                  <p>No chat history yet</p>
-                  <p className="text-sm">Start a new chat to begin</p>
-                </div>
-              ) : (
-                chatHistory.map((chat) => (
-                  <div
-                    key={chat._id}
-                    className="p-2 rounded transition-colors hover:bg-gray-100 flex justify-between items-center"
-                  >
-                    <div 
-                      onClick={() => loadChat(chat)}
-                      className={`flex-1 min-w-0 mr-2 cursor-pointer p-2 rounded ${
-                        chat._id === chatId ? 'bg-blue-100' : ''
-                      }`}
-                    >
-                      <div className="font-medium truncate text-gray-800">
-                        {chat.messages[0]?.content.substring(0, 30)}...
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {new Date(chat.updatedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (window.confirm('Are you sure you want to delete this chat?')) {
-                          handleDeleteChat(chat._id);
-                        }
-                      }}
-                      className="p-2 hover:bg-red-100 rounded-full transition-colors flex items-center justify-center min-w-[40px] min-h-[40px]"
-                      title="Delete chat"
-                    >
-                      <TrashIcon className="h-5 w-5 text-red-500" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Chat Area */}
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center text-gray-500">
-                    <p className="text-lg font-medium mb-2">Welcome to Career Guidance Assistant!</p>
-                    <p>Start a new chat or select an existing one to begin.</p>
-                    <p className="text-sm mt-2">You can also upload PDFs or images for analysis.</p>
-                  </div>
-                </div>
-              ) : (
-                messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    <div
-                      className={`max-w-[80%] p-3 rounded-lg ${
-                        message.role === 'user'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {message.filePreview && (
-                        <div className="mb-2">
-                          {/* Commenting out image preview
-                          {message.fileType?.includes('image') ? (
-                            <div className="relative">
-                              <img 
-                                src={message.filePreview} 
-                                alt="Uploaded content"
-                                className="max-w-full rounded-lg mb-2"
-                                style={{ maxHeight: '200px' }}
-                              />
-                              <div className="text-xs opacity-75 mt-1">
-                                {message.fileName}
-                              </div>
-                            </div>
-                          ) : message.filePreview === 'pdf' && (
-                            <div className="flex items-center space-x-2 mb-2 p-2 bg-gray-700 rounded">
-                              <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M4 18h12a2 2 0 002-2V6a2 2 0 00-2-2h-3.93a2 2 0 01-1.66-.89l-.812-1.22A2 2 0 008.93 1H4a2 2 0 00-2 2v13a2 2 0 002 2z" />
-                              </svg>
-                              <span className="text-sm text-white">{message.fileName}</span>
-                            </div>
-                          )}
-                          */}
-                          {/* Only show file name */}
-                          <div className="text-xs text-gray-500">
-                            {message.fileName}
+              <div className="p-4">
+                <button
+                  onClick={handleNewChat}
+                  className={`w-full flex items-center justify-center px-4 py-3 rounded-lg ${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'} text-white transition-colors shadow-md`}
+                >
+                  <ChatBubbleLeftRightIcon className="h-5 w-5 mr-2" />
+                  New Conversation
+                </button>
+                
+                <div className="mt-6">
+                  <h2 className={`text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} uppercase tracking-wider mb-2`}>
+                    Recent Conversations
+                  </h2>
+                  <div className="space-y-2">
+                    {chatHistory.map((chat) => (
+                      <div
+                        key={chat._id}
+                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                          chatId === chat._id
+                            ? theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-blue-50 text-blue-800'
+                            : theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                        }`}
+                        onClick={() => loadChat(chat)}
+                      >
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <ChatBubbleLeftRightIcon className={`h-5 w-5 ${chatId === chat._id ? (theme === 'dark' ? 'text-blue-400' : 'text-blue-600') : (theme === 'dark' ? 'text-gray-400' : 'text-gray-500')}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate font-medium">
+                              {chat.title || `Conversation ${chatHistory.indexOf(chat) + 1}`}
+                            </p>
+                            <p className={`text-xs truncate ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {new Date(chat.createdAt).toLocaleDateString()}
+                            </p>
                           </div>
                         </div>
-                      )}
-                      <div className="whitespace-pre-wrap">{message.content}</div>
-                    </div>
-                  </div>
-                ))
-              )}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-gray-100 p-3 rounded-lg">
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {isProcessingFile && (
-                <div className="flex justify-center">
-                  <div className="bg-blue-100 text-blue-800 p-2 rounded-lg">
-                    Processing file... Please wait.
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-4 border-t">
-              {filePreview && (
-                <div className="mb-4 relative">
-                  <div className="flex items-start space-x-2 p-2 bg-gray-50 rounded-lg">
-                    {filePreview === 'pdf' ? (
-                      <div className="flex items-center space-x-2 p-2 bg-gray-200 rounded">
-                        <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M4 18h12a2 2 0 002-2V6a2 2 0 00-2-2h-3.93a2 2 0 01-1.66-.89l-.812-1.22A2 2 0 008.93 1H4a2 2 0 00-2 2v13a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-sm">{currentFile?.name}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteChat(chat._id);
+                          }}
+                          className={`p-1 rounded-full ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} opacity-60 hover:opacity-100 transition-opacity`}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
                       </div>
-                    ) : (
-                      <div className="relative">
-                        <img 
-                          src={filePreview} 
-                          alt="Preview" 
-                          className="max-h-32 rounded"
-                        />
-                        <div className="text-xs text-gray-500 mt-1">
-                          {currentFile?.name}
-                        </div>
+                    ))}
+                    
+                    {chatHistory.length === 0 && (
+                      <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-500'} text-center`}>
+                        <p>No conversation history</p>
                       </div>
                     )}
-                    <button
-                      type="button"
-                      onClick={clearFileUpload}
-                      className="p-1 hover:bg-gray-200 rounded-full"
-                    >
-                      <XMarkIcon className="w-5 h-5 text-gray-500" />
-                    </button>
                   </div>
                 </div>
-              )}
-              <div className="flex space-x-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept="image/*,.pdf"
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2 text-gray-500 hover:text-blue-600 transition-colors"
-                  disabled={isLoading || isProcessingFile}
-                  title="Upload PDF or Image"
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Chat Area */}
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+          {/* Chat Messages */}
+          <div 
+            className={`flex-1 overflow-y-auto p-4 space-y-4 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}
+            onClick={(e) => {
+              if (window.innerWidth < 768 && showSidebar) {
+                setShowSidebar(false);
+              }
+            }}
+          >
+            <AnimatePresence>
+              {messages.map((message, index) => (
+                <motion.div
+                  key={index}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  variants={messageContainerVariants}
+                  className={`flex ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
                 >
-                  <PaperClipIcon className="h-6 w-6" />
+                  <div
+                    className={`max-w-3xl rounded-2xl p-4 ${
+                      message.role === 'user'
+                        ? theme === 'dark' 
+                          ? 'bg-blue-700 text-white' 
+                          : 'bg-blue-600 text-white shadow-blue-100'
+                        : theme === 'dark'
+                          ? 'bg-gray-800 text-white shadow-md' 
+                          : 'bg-white text-gray-800 shadow-sm'
+                    } ${message.role === 'user' ? 'shadow-lg' : 'shadow-md'}`}
+                  >
+                    {message.file && (
+                      <div className="mb-3 rounded-lg overflow-hidden">
+                        {message.file.type.startsWith('image/') ? (
+                          <motion.img
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.3 }}
+                            src={message.file.preview}
+                            alt="Uploaded content"
+                            className="max-w-xs rounded-lg"
+                          />
+                        ) : (
+                          <div className={`flex items-center p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                            <DocumentIcon className="h-5 w-5 mr-2" />
+                            <span>{message.file.name}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="whitespace-pre-wrap">{message.content}</div>
+                  </div>
+                </motion.div>
+              ))}
+
+              {isTyping && (
+                <motion.div 
+                  initial="hidden"
+                  animate="visible"
+                  variants={messageContainerVariants}
+                  className="flex justify-start"
+                >
+                  <div 
+                    className={`rounded-2xl p-4 ${
+                      theme === 'dark' 
+                        ? 'bg-gray-800 text-white' 
+                        : 'bg-white text-gray-800'
+                    } shadow-sm`}
+                  >
+                    <div className="flex space-x-2">
+                      <motion.div 
+                        className={`w-2 h-2 rounded-full ${theme === 'dark' ? 'bg-blue-400' : 'bg-blue-600'}`} 
+                        animate={{ y: [0, -5, 0] }}
+                        transition={{ duration: 0.6, repeat: Infinity, repeatType: "loop" }}
+                      />
+                      <motion.div 
+                        className={`w-2 h-2 rounded-full ${theme === 'dark' ? 'bg-blue-400' : 'bg-blue-600'}`} 
+                        animate={{ y: [0, -5, 0] }}
+                        transition={{ duration: 0.6, delay: 0.2, repeat: Infinity, repeatType: "loop" }}
+                      />
+                      <motion.div 
+                        className={`w-2 h-2 rounded-full ${theme === 'dark' ? 'bg-blue-400' : 'bg-blue-600'}`} 
+                        animate={{ y: [0, -5, 0] }}
+                        transition={{ duration: 0.6, delay: 0.4, repeat: Infinity, repeatType: "loop" }}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className={`${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t p-4`}>
+            {currentFile && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className={`mb-3 p-2 rounded-lg flex items-center justify-between ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}
+              >
+                <div className="flex items-center space-x-2">
+                  {currentFile.type.startsWith('image/') ? (
+                    <PhotoIcon className="h-5 w-5" />
+                  ) : (
+                    <DocumentIcon className="h-5 w-5" />
+                  )}
+                  <span className="truncate max-w-xs">{currentFile.name}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setCurrentFile(null);
+                    setFilePreview(null);
+                    setFileContent('');
+                  }}
+                  className="p-1 rounded-full hover:bg-gray-600 transition-colors"
+                >
+                  <XMarkIcon className="h-4 w-4" />
                 </button>
+              </motion.div>
+            )}
+
+            <form onSubmit={handleSubmit} className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={`p-2 rounded-full ${
+                  theme === 'dark' 
+                    ? 'hover:bg-gray-600' 
+                    : 'hover:bg-gray-200'
+                } transition-colors`}
+              >
+                <PaperClipIcon className="h-5 w-5" />
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden"
+                accept="image/*,.pdf"
+              />
+              <div className="flex-1 relative">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={fileContent ? "What would you like to know about this file?" : "Ask me anything about your career..."}
-                  className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isLoading || isProcessingFile}
+                  placeholder="Type your message..."
+                  className={`w-full px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    theme === 'dark' 
+                      ? 'bg-gray-700 text-white placeholder-gray-400' 
+                      : 'bg-gray-100 text-gray-900 placeholder-gray-500'
+                  }`}
                 />
-                <button
-                  type="submit"
-                  disabled={isLoading || isProcessingFile || (!input.trim() && !fileContent)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-                >
-                  Send
-                </button>
               </div>
+              <button
+                type="submit"
+                disabled={isLoading || isProcessingFile}
+                className={`p-2 rounded-full ${
+                  isLoading || isProcessingFile
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : theme === 'dark'
+                      ? 'bg-blue-600 hover:bg-blue-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                } text-white transition-colors`}
+              >
+                {isLoading || isProcessingFile ? (
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 rounded-full bg-white animate-bounce" />
+                    <div className="w-2 h-2 rounded-full bg-white animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    <div className="w-2 h-2 rounded-full bg-white animate-bounce" style={{ animationDelay: '0.4s' }} />
+                  </div>
+                ) : (
+                  <PaperAirplaneIcon className="h-5 w-5" />
+                )}
+              </button>
             </form>
           </div>
         </div>
@@ -763,4 +742,4 @@ ${conversationHistory.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}:
   );
 };
 
-export default SmartBotPage; 
+export default SmartBotPage;
