@@ -10,11 +10,8 @@ import HomePage from './pages/HomePage';
 // Dashboard Pages
 import SkillSnapshotPage from './pages/dashboard/SkillSnapshotPage';
 import CareerSuggestionsPage from './pages/dashboard/CareerSuggestionsPage';
-import SkillGapAnalysisPage from './pages/dashboard/SkillGapAnalysisPage';
 import ResumeCenterPage from './pages/dashboard/ResumeCenterPage';
 import InterviewPrepPage from './pages/dashboard/InterviewPrepPage';
-import NetworkingZonePage from './pages/dashboard/NetworkingZonePage';
-import ProgressTrackerPage from './pages/dashboard/ProgressTrackerPage';
 import JobApplyPage from './pages/dashboard/JobApplyPage';
 
 // Other Main Pages
@@ -61,14 +58,6 @@ export default function App() {
           }
         />
         <Route
-          path="/dashboard/gaps"
-          element={
-            <DashboardLayout>
-              <SkillGapAnalysisPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
           path="/dashboard/jobs"
           element={
             <DashboardLayout>
@@ -89,22 +78,6 @@ export default function App() {
           element={
             <DashboardLayout>
               <InterviewPrepPage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/dashboard/networking"
-          element={
-            <DashboardLayout>
-              <NetworkingZonePage />
-            </DashboardLayout>
-          }
-        />
-        <Route
-          path="/dashboard/progress"
-          element={
-            <DashboardLayout>
-              <ProgressTrackerPage />
             </DashboardLayout>
           }
         />

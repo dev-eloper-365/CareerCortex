@@ -412,10 +412,55 @@ ${conversation}`;
   }
 };
 
+const processPDF = async (req, res) => {
+  try {
+    if (!req.files || !req.files.pdf) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+
+    const pdfFile = req.files.pdf;
+    const instructions = req.body.instructions || '';
+
+    // Convert PDF file to base64
+    const pdfBase64 = pdfFile.data.toString('base64');
+
+    // Call PDF.co API to extract text
+    const response = await axios.post('https://api.pdf.co/v1/pdf/convert/to/text', {
+      url: `data:application/pdf;base64,${pdfBase64}`,
+      apiKey: process.env.PDF_CO_API_KEY
+    });
+
+    if (!response.data || !response.data.url) {
+      throw new Error('Failed to extract text from PDF');
+    }
+
+    // Get the extracted text
+    const textResponse = await axios.get(response.data.url);
+    const extractedText = textResponse.data;
+
+    // Combine extracted text with user instructions
+    const combinedText = `${extractedText}\n\nUser Instructions: ${instructions}`;
+
+    // Send the combined text to the chat
+    const chatResponse = await chatWithBot(req, {
+      body: {
+        message: combinedText,
+        chatId: req.body.chatId
+      }
+    });
+
+    res.json(chatResponse);
+  } catch (error) {
+    console.error('Error processing PDF:', error);
+    res.status(500).json({ error: 'Failed to process PDF file' });
+  }
+};
+
 module.exports = {
   createNewChat,
   chatWithBot,
   getChatHistory,
   deleteChat,
-  analyzeChat
+  analyzeChat,
+  processPDF
 }; 

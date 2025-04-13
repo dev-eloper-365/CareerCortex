@@ -23,6 +23,8 @@ app.use(express.json());
 // Import routes
 const smartBotRoutes = require('./routes/smartBotRoutes');
 const authRoutes = require('./routes/authRoutes');
+const pdfRoutes = require('./routes/pdfRoutes');
+const analysisRoutes = require('./routes/analysis');
 
 // Routes
 app.get('/', (req, res) => {
@@ -32,6 +34,8 @@ app.get('/', (req, res) => {
 // Use routes
 app.use('/api/smart-bot', smartBotRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/pdf', pdfRoutes);
+app.use('/api/analysis', analysisRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

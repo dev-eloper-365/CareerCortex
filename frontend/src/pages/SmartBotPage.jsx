@@ -20,7 +20,6 @@ const SmartBotPage = () => {
   const navigate = useNavigate();
   const [filePreview, setFilePreview] = useState(null);
   const [currentFile, setCurrentFile] = useState(null);
-  const [conversationHistory, setConversationHistory] = useState([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -115,7 +114,6 @@ const SmartBotPage = () => {
         // Clear current chat state
         setMessages([]);
         setChatId(response.data.chatId);
-        setConversationHistory([]);
         
         // Refresh chat history
         await loadChatHistory();
@@ -242,23 +240,6 @@ const SmartBotPage = () => {
     }
   };
 
-  const saveConversationToFile = () => {
-    const conversationText = conversationHistory.map(msg => {
-      const timestamp = new Date().toLocaleString();
-      return `${timestamp} - ${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
-    }).join('\n');
-
-    const blob = new Blob([conversationText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'conversation.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if ((!input.trim() && !fileContent) || !chatId || isProcessingFile) return;
@@ -272,9 +253,8 @@ const SmartBotPage = () => {
       fileType: currentFile?.type
     };
 
-    // Add user message to chat and conversation history
+    // Add user message to chat
     setMessages(prev => [...prev, displayMessage]);
-    setConversationHistory(prev => [...prev, displayMessage]);
     setIsLoading(true);
 
     try {
@@ -295,13 +275,12 @@ const SmartBotPage = () => {
       );
 
       if (response.data.success) {
-        // Add AI response to chat and conversation history
+        // Add AI response to chat
         const assistantMessage = { 
           role: 'assistant', 
           content: response.data.message 
         };
         setMessages(prev => [...prev, assistantMessage]);
-        setConversationHistory(prev => [...prev, assistantMessage]);
         loadChatHistory();
       }
     } catch (error) {
@@ -315,7 +294,6 @@ const SmartBotPage = () => {
           content: 'Sorry, I encountered an error. Please try again.' 
         };
         setMessages(prev => [...prev, errorMessage]);
-        setConversationHistory(prev => [...prev, errorMessage]);
       }
     } finally {
       setInput('');
@@ -372,126 +350,42 @@ const SmartBotPage = () => {
     }
   };
 
-  const handleEndConversation = async () => {
-    if (conversationHistory.length > 0) {
-      try {
-        // First save the conversation
-        await axios.post(
-          'http://localhost:5000/api/smart-bot/save-conversation',
-          {
-            conversation: conversationHistory,
-            chatId
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          }
-        );
-
-        // Then send for analysis
-        const analysisPrompt = `Analyze the following conversation and extract insights about the user's interests and potential. Your tasks are:
-
-Identify 5 relevant skill categories based on the conversation (e.g., tech, creativity, business, research, communication, etc.). You may define any 5 custom skill names that are most applicable to the user's context.
-
-Score each skill as an integer from 0 to 10 (do not use /10 or any extra text).
-
-Suggest 3 career paths based on the conversation:
-
-career1: the most suitable career.
-
-career2: a closely related alternate career.
-
-career3: another alternate career in the same domain.
-
-Include a brief description for each career.
-
-Return the result strictly in the following JSON format:
-
-json format:
-{
-  "chatId": "${chatId}",
-  "timestamp": "${new Date().toISOString()}",
-  "analysis": {
-    "skills": {
-      "skill_1": x,
-      "skill_2": x,
-      "skill_3": x,
-      "skill_4": x,
-      "skill_5": x
-    },
-    "career1": {
-      "title": "Career Title Here",
-      "description": "Brief description of the career1"
-    },
-    "career2": {
-      "title": "Career Title Here",
-      "description": "Brief description of the career2"
-    },
-    "career3": {
-      "title": "Career Title Here",
-      "description": "Brief description of the career3"
+  const handleAnalyzeChat = async () => {
+    if (!chatId) {
+      toast.error('No active chat to analyze');
+      return;
     }
-  }
-}
-Rules:
 
-Use exactly 5 skill categories relevant to the conversation.
-
-Skill values must be plain integers (e.g., "tech": 8), not strings, and must not exceed 10.
-
-Each career must include a title and a description.
-
-chatId and timestamp should be string fields (you can use placeholders if necessary).
-
-Return only valid JSON. No extra explanations, markdown, or formatting.
-
-Conversation to analyze:
-${conversationHistory.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n')}`;
-
-        const analysisResponse = await axios.post(
-          'http://localhost:5000/api/smart-bot/chat',
-          {
-            message: analysisPrompt,
-            chatId
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          }
-        );
-
-        if (analysisResponse.data.success) {
-          try {
-            const analysisResult = JSON.parse(analysisResponse.data.message);
-            // Send analysis result to backend to save in MongoDB
-            await axios.post(
-              'http://localhost:5000/api/smart-bot/save-analysis',
-              {
-                analysis: analysisResult,
-                chatId
-              },
-              {
-                headers: {
-                  'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-              }
-            );
-            toast.success('Analysis completed and saved successfully');
-          } catch (error) {
-            console.error('Error handling analysis result:', error);
-            toast.error('Analysis completed but failed to save result');
+    try {
+      const response = await axios.post(
+        `http://localhost:5000/api/smart-bot/analyze/${chatId}`,
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         }
-      } catch (error) {
-        console.error('Error in analysis process:', error);
-        toast.error('Failed to complete analysis');
+      );
+
+      if (response.data.success) {
+        toast.success(
+          <div>
+            <p>Chat analysis saved successfully!</p>
+            <p className="text-xs mt-1">Chat log: {response.data.filename}</p>
+            <p className="text-xs">Analysis: {response.data.formattedResponseFilename}</p>
+          </div>
+        );
+      } else {
+        toast.error(response.data.message || 'Failed to analyze chat');
+      }
+    } catch (error) {
+      console.error('Error analyzing chat:', error);
+      if (error.response?.status === 401) {
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to analyze chat. Please try again.');
       }
     }
-    // Create a new chat before navigating to dashboard
-    await startNewChat();
-    navigate('/dashboard');
   };
 
   return (
@@ -529,21 +423,21 @@ ${conversationHistory.map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}:
               </Link>
               <h1 className="text-2xl font-bold">Career Guidance Assistant</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <button 
-                onClick={handleEndConversation}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
+            {chatId && (
+              <button
+                onClick={handleAnalyzeChat}
+                className="p-2 rounded-full hover:bg-blue-700 transition-colors"
+                title="Analyze chat"
               >
-                <span>Analyze Conversation</span>
-                <ChartBarIcon className="h-5 w-5" />
+                <ChartBarIcon className="h-6 w-6" />
               </button>
-              <button 
-                onClick={toggleSidebar}
-                className="md:hidden p-2 rounded-full hover:bg-blue-700 transition-colors"
-              >
-                <ChatBubbleLeftRightIcon className="h-6 w-6" />
-              </button>
-            </div>
+            )}
+            <button 
+              onClick={toggleSidebar}
+              className="md:hidden p-2 rounded-full hover:bg-blue-700 transition-colors"
+            >
+              <ChatBubbleLeftRightIcon className="h-6 w-6" />
+            </button>
           </div>
         </div>
       </div>

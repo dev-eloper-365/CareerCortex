@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { createNewChat, chatWithBot, getChatHistory, deleteChat, analyzeChat } = require('../controllers/smartBotController');
+const { createNewChat, chatWithBot, getChatHistory, deleteChat, analyzeChat, processPDF } = require('../controllers/smartBotController');
 const auth = require('../middleware/auth');
+const fileUpload = require('express-fileupload');
 
 // Create a new chat
 router.post('/new', auth, createNewChat);
@@ -17,5 +18,8 @@ router.post('/analyze/:chatId', auth, analyzeChat);
 
 // Delete a chat
 router.delete('/:chatId', auth, deleteChat);
+
+// PDF processing route
+router.post('/process-pdf', auth, fileUpload(), processPDF);
 
 module.exports = router; 
